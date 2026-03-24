@@ -1,1 +1,1430 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AI Assistant</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  /* ═══════════════════════════════════════════
+     VARIABLES & THEMES
+  ═══════════════════════════════════════════ */
+  :root {
+    --bg:          #080c14;
+    --surface:     #0d1320;
+    --surface2:    #131b2e;
+    --border:      rgba(99,132,255,0.12);
+    --border2:     rgba(99,132,255,0.22);
+    --accent:      #6384ff;
+    --accent2:     #a78bfa;
+    --text:        #e8ecf7;
+    --text2:       #7b88b0;
+    --text3:       #3d4a6b;
+    --user-bubble: #1a2456;
+    --ai-bubble:   #0f1828;
+    --input-bg:    #0d1320;
+    --glow:        rgba(99,132,255,0.15);
+    --font-main:   'Syne', sans-serif;
+    --font-mono:   'JetBrains Mono', monospace;
+    --radius:      16px;
+    --radius-sm:   10px;
+    --shadow:      0 8px 32px rgba(0,0,0,0.5);
+  }
+  [data-theme="light"] {
+    --bg:          #f0f2fc;
+    --surface:     #ffffff;
+    --surface2:    #e8ecf7;
+    --border:      rgba(99,132,255,0.2);
+    --border2:     rgba(99,132,255,0.35);
+    --text:        #1a2040;
+    --text2:       #5a6488;
+    --text3:       #b0bad8;
+    --user-bubble: #dde3ff;
+    --ai-bubble:   #ffffff;
+    --input-bg:    #ffffff;
+    --glow:        rgba(99,132,255,0.08);
+    --shadow:      0 8px 32px rgba(99,132,255,0.12);
+  }
+  [data-theme="nord"] {
+    --bg:          #2e3440;
+    --surface:     #3b4252;
+    --surface2:    #434c5e;
+    --border:      rgba(136,192,208,0.2);
+    --border2:     rgba(136,192,208,0.35);
+    --accent:      #88c0d0;
+    --accent2:     #81a1c1;
+    --text:        #eceff4;
+    --text2:       #d8dee9;
+    --text3:       #8490a8;
+    --user-bubble: #4c566a;
+    --ai-bubble:   #3b4252;
+    --input-bg:    #3b4252;
+    --glow:        rgba(136,192,208,0.1);
+  }
+  [data-theme="midnight"] {
+    --bg:          #000000;
+    --surface:     #0a0a0a;
+    --surface2:    #111111;
+    --border:      rgba(255,255,255,0.06);
+    --border2:     rgba(255,255,255,0.12);
+    --accent:      #ffffff;
+    --accent2:     #888888;
+    --text:        #ffffff;
+    --text2:       #666666;
+    --text3:       #333333;
+    --user-bubble: #1a1a1a;
+    --ai-bubble:   #0d0d0d;
+    --input-bg:    #0a0a0a;
+    --glow:        rgba(255,255,255,0.04);
+  }
+  [data-theme="aurora"] {
+    --bg:          #0a1628;
+    --surface:     #0f2040;
+    --surface2:    #142850;
+    --border:      rgba(0,255,180,0.12);
+    --border2:     rgba(0,255,180,0.25);
+    --accent:      #00ffb4;
+    --accent2:     #7c3aed;
+    --text:        #d4fef0;
+    --text2:       #7ab8a0;
+    --text3:       #2d6050;
+    --user-bubble: #0d2d40;
+    --ai-bubble:   #0a1e30;
+    --input-bg:    #0f2040;
+    --glow:        rgba(0,255,180,0.1);
+  }
 
+  /* ═══════════════════════════════════════════
+     RESET & BASE
+  ═══════════════════════════════════════════ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%; width: 100%;
+    overflow: hidden;
+    font-family: var(--font-main);
+    font-size: 15px;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { cursor: pointer; font-family: var(--font-main); border: none; background: none; }
+  input, textarea { font-family: var(--font-main); }
+
+  /* ═══════════════════════════════════════════
+     ANIMATED BACKGROUNDS
+  ═══════════════════════════════════════════ */
+  #bg-canvas {
+    position: fixed; inset: 0; z-index: 0;
+    pointer-events: none;
+  }
+
+  /* ═══════════════════════════════════════════
+     LAYOUT
+  ═══════════════════════════════════════════ */
+  #app {
+    position: relative; z-index: 1;
+    height: 100dvh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ═══════════════════════════════════════════
+     HEADER
+  ═══════════════════════════════════════════ */
+  #header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px 12px;
+    background: linear-gradient(180deg, var(--bg) 60%, transparent);
+    flex-shrink: 0;
+    position: relative;
+  }
+  .header-left { display: flex; align-items: center; gap: 10px; }
+  .avatar-ring {
+    width: 38px; height: 38px; border-radius: 50%;
+    border: 1.5px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface2);
+    box-shadow: 0 0 14px var(--glow);
+    position: relative; overflow: hidden;
+    flex-shrink: 0;
+  }
+  .avatar-ring svg { width: 20px; height: 20px; opacity: 0.9; }
+  .avatar-pulse {
+    position: absolute; inset: -3px; border-radius: 50%;
+    border: 1px solid var(--accent);
+    opacity: 0; animation: pulse-ring 3s ease-out infinite;
+  }
+  @keyframes pulse-ring {
+    0%   { transform: scale(1); opacity: 0.4; }
+    100% { transform: scale(1.5); opacity: 0; }
+  }
+  .header-info { display: flex; flex-direction: column; gap: 1px; }
+  .header-name {
+    font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
+    color: var(--text);
+  }
+  .header-status {
+    font-size: 10px; font-family: var(--font-mono);
+    color: var(--accent); letter-spacing: 0.06em;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .status-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+    animation: blink 2.5s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .header-actions { display: flex; gap: 6px; }
+  .icon-btn {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; color: var(--text2);
+  }
+  .icon-btn:active { transform: scale(0.93); background: var(--border2); }
+  .icon-btn svg { width: 16px; height: 16px; }
+
+  /* ═══════════════════════════════════════════
+     MESSAGES
+  ═══════════════════════════════════════════ */
+  #messages {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    padding: 8px 16px 12px;
+    display: flex; flex-direction: column; gap: 10px;
+    scroll-behavior: smooth;
+  }
+  #messages::-webkit-scrollbar { width: 3px; }
+  #messages::-webkit-scrollbar-track { background: transparent; }
+  #messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* date divider */
+  .date-divider {
+    text-align: center; margin: 6px 0;
+    font-size: 10px; font-family: var(--font-mono);
+    color: var(--text3); letter-spacing: 0.05em;
+  }
+
+  /* message row */
+  .msg-row {
+    display: flex; gap: 8px; align-items: flex-end;
+    animation: msg-in 0.28s cubic-bezier(0.34,1.56,0.64,1) both;
+  }
+  .msg-row.user { flex-direction: row-reverse; }
+  @keyframes msg-in {
+    from { opacity: 0; transform: translateY(12px) scale(0.96); }
+    to   { opacity: 1; transform: none; }
+  }
+  .msg-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--surface2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .msg-avatar svg { width: 13px; height: 13px; opacity: 0.7; }
+  .bubble {
+    max-width: 78%; padding: 10px 13px;
+    border-radius: var(--radius);
+    font-size: 14px; line-height: 1.5; font-weight: 400;
+    position: relative; word-break: break-word;
+    backdrop-filter: blur(8px);
+  }
+  .msg-row.user  .bubble {
+    background: var(--user-bubble);
+    border: 1px solid var(--border2);
+    border-bottom-right-radius: 4px;
+    box-shadow: var(--shadow);
+  }
+  .msg-row.ai .bubble {
+    background: var(--ai-bubble);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+    box-shadow: var(--shadow);
+  }
+  .bubble-time {
+    font-size: 9px; font-family: var(--font-mono);
+    color: var(--text3); margin-top: 4px;
+    display: block; text-align: right;
+    letter-spacing: 0.03em;
+  }
+
+  /* typing indicator */
+  .typing-indicator {
+    display: flex; align-items: center; gap: 4px;
+    padding: 12px 14px;
+    background: var(--ai-bubble);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    border-bottom-left-radius: 4px;
+    width: fit-content;
+  }
+  .typing-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--accent); opacity: 0.7;
+    animation: typing-bounce 1.4s ease-in-out infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typing-bounce {
+    0%,60%,100%{ transform: translateY(0); opacity:0.4; }
+    30%        { transform: translateY(-6px); opacity:1; }
+  }
+
+  /* welcome state */
+  #welcome {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 16px; padding: 32px;
+    text-align: center;
+  }
+  .welcome-icon {
+    width: 64px; height: 64px; border-radius: 20px;
+    background: var(--surface2); border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 30px var(--glow);
+  }
+  .welcome-icon svg { width: 32px; height: 32px; }
+  .welcome-title {
+    font-size: 22px; font-weight: 800;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, var(--text) 0%, var(--accent2) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .welcome-sub { font-size: 13px; color: var(--text2); line-height: 1.6; max-width: 260px; }
+  .welcome-hints { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 300px; }
+  .hint-chip {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 10px 14px;
+    font-size: 12px; color: var(--text2); text-align: left;
+    cursor: pointer; transition: all 0.2s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .hint-chip:active { background: var(--border); color: var(--text); }
+  .hint-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+  /* ═══════════════════════════════════════════
+     INPUT BAR
+  ═══════════════════════════════════════════ */
+  #input-bar {
+    padding: 10px 14px 16px;
+    background: linear-gradient(0deg, var(--bg) 70%, transparent);
+    flex-shrink: 0;
+  }
+  .input-wrap {
+    display: flex; align-items: flex-end; gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 8px 8px 8px 14px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+  }
+  .input-wrap:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--glow), 0 4px 20px rgba(0,0,0,0.3);
+  }
+  #user-input {
+    flex: 1; background: none; border: none; outline: none;
+    color: var(--text); font-size: 14px; line-height: 1.5;
+    resize: none; min-height: 22px; max-height: 120px;
+    padding: 2px 0;
+    scrollbar-width: none;
+  }
+  #user-input::placeholder { color: var(--text3); }
+  #user-input::-webkit-scrollbar { display: none; }
+  #send-btn {
+    width: 36px; height: 36px; border-radius: 12px;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.2s;
+    box-shadow: 0 2px 12px var(--glow);
+  }
+  #send-btn:active { transform: scale(0.9); }
+  #send-btn:disabled { opacity: 0.4; pointer-events: none; }
+  #send-btn svg { width: 16px; height: 16px; }
+
+  /* clear btn inside input */
+  #clear-btn {
+    width: 28px; height: 28px; border-radius: 8px;
+    color: var(--text3); display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; flex-shrink: 0;
+  }
+  #clear-btn:active { color: var(--accent); }
+  #clear-btn svg { width: 14px; height: 14px; }
+
+  /* voice & photo buttons */
+  .input-extra-btn {
+    width: 32px; height: 32px; border-radius: 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text2); display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.2s;
+  }
+  .input-extra-btn:active { transform: scale(0.9); }
+  .input-extra-btn svg { width: 15px; height: 15px; }
+  .input-extra-btn.recording {
+    background: rgba(239,68,68,0.2);
+    border-color: #ef4444;
+    color: #ef4444;
+    animation: rec-pulse 1s ease-in-out infinite;
+  }
+  @keyframes rec-pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+    50%      { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+  }
+
+  /* image preview in bubble */
+  .bubble-img {
+    max-width: 100%; border-radius: 10px;
+    margin-bottom: 6px; display: block;
+    border: 1px solid var(--border);
+  }
+
+  /* voice message bubble */
+  .voice-bubble {
+    display: flex; align-items: center; gap: 8px;
+    padding: 2px 0 6px;
+  }
+  .voice-icon {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .voice-icon svg { width: 14px; height: 14px; color: #fff; }
+  .voice-bars {
+    display: flex; align-items: center; gap: 2px; flex: 1;
+  }
+  .voice-bar {
+    width: 3px; border-radius: 2px;
+    background: var(--accent); opacity: 0.7;
+    animation: vbar 1.2s ease-in-out infinite;
+  }
+  .voice-bar:nth-child(1){ height:8px;  animation-delay:0s; }
+  .voice-bar:nth-child(2){ height:16px; animation-delay:0.1s; }
+  .voice-bar:nth-child(3){ height:10px; animation-delay:0.2s; }
+  .voice-bar:nth-child(4){ height:20px; animation-delay:0.15s; }
+  .voice-bar:nth-child(5){ height:12px; animation-delay:0.05s; }
+  @keyframes vbar {
+    0%,100%{ transform: scaleY(0.5); opacity:0.4; }
+    50%    { transform: scaleY(1);   opacity:1; }
+  }
+
+  /* ═══════════════════════════════════════════
+     SETTINGS PANEL
+  ═══════════════════════════════════════════ */
+  #settings-panel {
+    position: fixed; inset: 0; z-index: 100;
+    display: none; flex-direction: column;
+    background: var(--bg);
+  }
+  #settings-panel.open { display: flex; animation: slide-up 0.3s cubic-bezier(0.34,1.3,0.64,1); }
+  @keyframes slide-up {
+    from { transform: translateY(100%); }
+    to   { transform: none; }
+  }
+  .settings-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 18px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-title {
+    font-size: 17px; font-weight: 700; letter-spacing: -0.02em;
+  }
+  .close-btn {
+    width: 32px; height: 32px; border-radius: 9px;
+    background: var(--surface2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text2);
+  }
+  .close-btn svg { width: 14px; height: 14px; }
+  .settings-body { flex: 1; overflow-y: auto; padding: 20px 18px; display: flex; flex-direction: column; gap: 28px; }
+  .settings-section { display: flex; flex-direction: column; gap: 12px; }
+  .section-label {
+    font-size: 10px; font-family: var(--font-mono);
+    color: var(--text3); letter-spacing: 0.1em; text-transform: uppercase;
+    padding-left: 2px;
+  }
+
+  /* theme grid */
+  .theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .theme-card {
+    border-radius: 12px; overflow: hidden;
+    border: 2px solid var(--border);
+    cursor: pointer; transition: all 0.2s; position: relative;
+    height: 72px;
+  }
+  .theme-card.active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
+  .theme-card:active { transform: scale(0.97); }
+  .theme-preview {
+    width: 100%; height: 100%;
+    display: flex; align-items: flex-end; padding: 8px;
+    position: relative; overflow: hidden;
+  }
+  .theme-name {
+    font-size: 11px; font-weight: 600; z-index: 1;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+  }
+  .theme-check {
+    position: absolute; top: 6px; right: 6px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); display: none;
+    align-items: center; justify-content: center;
+  }
+  .theme-card.active .theme-check { display: flex; }
+  .theme-check svg { width: 10px; height: 10px; color: #fff; }
+
+  /* Theme previews */
+  .tp-dark    { background: linear-gradient(135deg, #080c14 0%, #1a2456 100%); color: #e8ecf7; }
+  .tp-light   { background: linear-gradient(135deg, #f0f2fc 0%, #dde3ff 100%); color: #1a2040; }
+  .tp-nord    { background: linear-gradient(135deg, #2e3440 0%, #4c566a 100%); color: #eceff4; }
+  .tp-midnight{ background: linear-gradient(135deg, #000 0%, #1a1a1a 100%);    color: #ffffff; }
+  .tp-aurora  { background: linear-gradient(135deg, #0a1628 0%, #0d2d40 100%); color: #d4fef0; }
+
+  /* bg grid */
+  .bg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .bg-card {
+    border-radius: 12px; overflow: hidden;
+    border: 2px solid var(--border);
+    cursor: pointer; transition: all 0.2s;
+    height: 64px; position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .bg-card.active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
+  .bg-card:active { transform: scale(0.95); }
+  .bg-card-label {
+    font-size: 10px; font-weight: 600; text-align: center;
+    position: relative; z-index: 1; color: var(--text);
+    text-shadow: 0 1px 6px rgba(0,0,0,0.6); padding: 4px;
+  }
+  .bg-check {
+    position: absolute; top: 4px; right: 4px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent); display: none;
+    align-items: center; justify-content: center;
+  }
+  .bg-card.active .bg-check { display: flex; }
+  .bg-check svg { width: 9px; height: 9px; color: #fff; }
+
+  .bp-none    { background: var(--surface2); }
+  .bp-space   { background: radial-gradient(ellipse at 30% 40%, #1a0a3d 0%, #000 60%), repeating-linear-gradient(0deg, transparent, transparent 30px, rgba(99,132,255,.03) 30px, rgba(99,132,255,.03) 31px); }
+  .bp-rain    { background: linear-gradient(180deg, #0a1020 0%, #0d1830 100%); }
+  .bp-matrix  { background: #000; }
+  .bp-geo     { background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 100%); }
+  .bp-waves   { background: linear-gradient(180deg, #050d1e 0%, #0a1a30 100%); }
+  .bp-grid    { background: #080c14; }
+
+  /* toggle */
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 12px 14px;
+  }
+  .toggle-label { font-size: 13px; color: var(--text2); }
+  .toggle {
+    width: 44px; height: 24px; border-radius: 12px;
+    background: var(--border2); position: relative; cursor: pointer;
+    transition: background 0.25s;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #fff; transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+  .toggle.on::after { transform: translateX(20px); }
+
+  /* ═══════════════════════════════════════════
+     MISC
+  ═══════════════════════════════════════════ */
+  .toast {
+    position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: 20px; padding: 8px 16px;
+    font-size: 12px; color: var(--text2);
+    opacity: 0; transition: all 0.3s;
+    pointer-events: none; white-space: nowrap; z-index: 200;
+    font-family: var(--font-mono); letter-spacing: 0.03em;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div id="app">
+  <!-- HEADER -->
+  <div id="header">
+    <div class="header-left">
+      <div class="avatar-ring">
+        <div class="avatar-pulse"></div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/>
+          <path d="M3 20a9 9 0 0 1 18 0"/>
+          <circle cx="19" cy="7" r="3" fill="var(--accent)" stroke="none"/>
+        </svg>
+      </div>
+      <div class="header-info">
+        <span class="header-name">AI Assistant</span>
+        <span class="header-status"><span class="status-dot"></span>online</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="icon-btn" id="clear-history-btn" title="Очистить историю">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+        </svg>
+      </button>
+      <button class="icon-btn" id="settings-btn" title="Настройки">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- MESSAGES -->
+  <div id="messages">
+    <div id="welcome">
+      <div class="welcome-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" width="32" height="32">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          <circle cx="9" cy="10" r="1" fill="var(--accent)" stroke="none"/>
+          <circle cx="12" cy="10" r="1" fill="var(--accent)" stroke="none"/>
+          <circle cx="15" cy="10" r="1" fill="var(--accent)" stroke="none"/>
+        </svg>
+      </div>
+      <div class="welcome-title">Привет</div>
+      <div class="welcome-sub">AI-ассистент готов к работе. Задайте любой вопрос.</div>
+      <div class="welcome-hints">
+        <div class="hint-chip" onclick="useHint(this)"><span class="hint-dot"></span>Что ты умеешь?</div>
+        <div class="hint-chip" onclick="useHint(this)"><span class="hint-dot"></span>Помоги написать текст</div>
+        <div class="hint-chip" onclick="useHint(this)"><span class="hint-dot"></span>Объясни сложную тему</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUT -->
+  <div id="input-bar">
+    <div class="input-wrap">
+      <!-- Кнопка голоса -->
+      <button class="input-extra-btn" id="voice-btn" title="Записать голос" onclick="toggleRecording()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </button>
+      <!-- Кнопка фото -->
+      <button class="input-extra-btn" id="photo-btn" title="Отправить фото" onclick="openPhoto()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="3"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <path d="M21 15l-5-5L5 21"/>
+        </svg>
+      </button>
+      <input type="file" id="photo-input" accept="image/*" style="display:none" onchange="handlePhoto(event)">
+      <textarea id="user-input" placeholder="Написать сообщение..." rows="1"></textarea>
+      <button id="clear-btn" onclick="clearInput()" title="Очистить">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+      <button id="send-btn" onclick="sendMessage()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div id="settings-panel">
+  <div class="settings-header">
+    <span class="settings-title">Настройки</span>
+    <button class="close-btn" id="close-settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+  <div class="settings-body">
+
+    <!-- THEMES -->
+    <div class="settings-section">
+      <div class="section-label">Тема</div>
+      <div class="theme-grid">
+        <div class="theme-card active" data-theme="dark" onclick="setTheme('dark',this)">
+          <div class="theme-preview tp-dark">
+            <span class="theme-name">Темная</span>
+            <div class="theme-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></div>
+          </div>
+        </div>
+        <div class="theme-card" data-theme="light" onclick="setTheme('light',this)">
+          <div class="theme-preview tp-light">
+            <span class="theme-name">Светлая</span>
+            <div class="theme-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></div>
+          </div>
+        </div>
+        <div class="theme-card" data-theme="nord" onclick="setTheme('nord',this)">
+          <div class="theme-preview tp-nord">
+            <span class="theme-name">Nord</span>
+            <div class="theme-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></div>
+          </div>
+        </div>
+        <div class="theme-card" data-theme="midnight" onclick="setTheme('midnight',this)">
+          <div class="theme-preview tp-midnight">
+            <span class="theme-name">Midnight</span>
+            <div class="theme-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></div>
+          </div>
+        </div>
+        <div class="theme-card" data-theme="aurora" onclick="setTheme('aurora',this)">
+          <div class="theme-preview tp-aurora">
+            <span class="theme-name">Aurora</span>
+            <div class="theme-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACKGROUNDS -->
+    <div class="settings-section">
+      <div class="section-label">Фон</div>
+      <div class="bg-grid">
+        <div class="bg-card active" data-bg="none" onclick="setBg('none',this)">
+          <div class="theme-preview bp-none" style="width:100%;height:100%;position:absolute;inset:0"></div>
+          <span class="bg-card-label">Нет</span>
+          <div class="bg-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></div>
+        </div>
+        <div class="bg-card" data-bg="space" onclick="setBg('space',this)">
+          <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 30% 40%,#1a0a3d,#000)"></div>
+          <span class="bg-card-label">Космос</span>
+          <div class="bg-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></div>
+        </div>
+        <div class="bg-card" data-bg="rain" onclick="setBg('rain',this)">
+          <div style="position:absolute;inset:0;background:linear-gradient(180deg,#0a1020,#0d1830)"></div>
+          <span class="bg-card-label">Дождь</span>
+          <div class="bg-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></div>
+        </div>
+        <div class="bg-card" data-bg="matrix" onclick="setBg('matrix',this)">
+          <div style="position:absolute;inset:0;background:#000"></div>
+          <span class="bg-card-label" style="color:#00ff41">Matrix</span>
+          <div class="bg-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></div>
+        </div>
+        <div class="bg-card" data-bg="geo" onclick="setBg('geo',this)">
+          <div style="position:absolute;inset:0;background:linear-gradient(135deg,#0a0a1a,#1a0a2e)"></div>
+          <span class="bg-card-label">Сетка</span>
+          <div class="bg-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></div>
+        </div>
+        <div class="bg-card" data-bg="waves" onclick="setBg('waves',this)">
+          <div style="position:absolute;inset:0;background:linear-gradient(180deg,#050d1e,#0a1a30)"></div>
+          <span class="bg-card-label">Волны</span>
+          <div class="bg-check"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1.5,5 4,7.5 8.5,2.5"/></svg></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TOGGLES -->
+    <div class="settings-section">
+      <div class="section-label">Интерфейс</div>
+      <div class="toggle-row">
+        <span class="toggle-label">Звук уведомлений</span>
+        <div class="toggle" id="toggle-sound" onclick="toggleSwitch(this)"></div>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Эффект печати</span>
+        <div class="toggle on" id="toggle-typing" onclick="toggleSwitch(this)"></div>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Анимации</span>
+        <div class="toggle on" id="toggle-anim" onclick="toggleSwitch(this)"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════
+//  CONFIG
+// ═══════════════════════════════════════════
+const GROQ_API_KEY = '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';
+const GROQ_MODEL   = 'llama-3.3-70b-versatile';
+const SYSTEM_PROMPT = 'Ты — умный AI-ассистент. Отвечай развёрнуто, по делу и вежливо на русском языке.';
+
+// ═══════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════
+let history     = [];
+let isLoading   = false;
+let currentBg   = 'none';
+let currentTheme= 'dark';
+let typingEffect= true;
+let animEnabled = true;
+let bgAnimId    = null;
+
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+// ═══════════════════════════════════════════
+//  CANVAS BACKGROUNDS
+// ═══════════════════════════════════════════
+const canvas = document.getElementById('bg-canvas');
+const ctx    = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+// -- SPACE --
+function initSpace() {
+  const stars = Array.from({length: 180}, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    r: Math.random() * 1.4 + 0.2,
+    o: Math.random() * 0.7 + 0.3,
+    s: Math.random() * 0.004 + 0.001,
+    p: Math.random() * Math.PI * 2,
+  }));
+  // Shooting stars
+  const shoots = [];
+  function addShoot() {
+    shoots.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height*0.5, len: Math.random()*80+40, speed: Math.random()*5+4, angle: Math.PI/4 + (Math.random()-0.5)*0.3, life:1 });
+  }
+  let t = 0;
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    // nebula
+    const g1 = ctx.createRadialGradient(canvas.width*.3, canvas.height*.3, 0, canvas.width*.3, canvas.height*.3, canvas.width*.5);
+    g1.addColorStop(0,'rgba(60,20,120,0.18)'); g1.addColorStop(1,'transparent');
+    ctx.fillStyle = g1; ctx.fillRect(0,0,canvas.width,canvas.height);
+    // stars
+    stars.forEach(s => {
+      s.p += s.s; const a = s.o * (0.5 + 0.5*Math.sin(s.p));
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(200,210,255,${a})`; ctx.fill();
+    });
+    // shooting
+    if (t % 200 < 2) addShoot();
+    for (let i = shoots.length-1; i >= 0; i--) {
+      const s = shoots[i]; s.life -= 0.025;
+      if (s.life <= 0) { shoots.splice(i,1); continue; }
+      ctx.save();
+      ctx.globalAlpha = s.life * 0.8;
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
+      ctx.shadowBlur = 6; ctx.shadowColor = '#aaaaff';
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x - Math.cos(s.angle)*s.len, s.y - Math.sin(s.angle)*s.len);
+      ctx.stroke(); ctx.restore();
+      s.x += Math.cos(s.angle)*s.speed;
+      s.y += Math.sin(s.angle)*s.speed;
+    }
+    t++; bgAnimId = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// -- RAIN --
+function initRain() {
+  const drops = Array.from({length: 140}, () => ({
+    x: Math.random()*canvas.width, y: Math.random()*canvas.height,
+    l: Math.random()*18+8, s: Math.random()*6+3,
+    o: Math.random()*0.3+0.05,
+    w: Math.random()*0.8+0.2,
+  }));
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    drops.forEach(d => {
+      ctx.beginPath();
+      ctx.moveTo(d.x, d.y);
+      ctx.lineTo(d.x - d.w, d.y + d.l);
+      ctx.strokeStyle = `rgba(140,180,255,${d.o})`;
+      ctx.lineWidth = d.w; ctx.stroke();
+      d.y += d.s;
+      if (d.y > canvas.height) { d.y = -20; d.x = Math.random()*canvas.width; }
+    });
+    bgAnimId = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// -- MATRIX --
+function initMatrix() {
+  const cols = Math.floor(canvas.width/14);
+  const rows = Array(cols).fill(0);
+  const chars = '01アイウエオカキクケコサシスセソタチツテトナニヌネノ';
+  function draw() {
+    ctx.fillStyle = 'rgba(0,0,0,0.06)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.font = '12px ' + "'JetBrains Mono', monospace";
+    rows.forEach((y, i) => {
+      const c = chars[Math.floor(Math.random()*chars.length)];
+      const x = i * 14;
+      ctx.fillStyle = `rgba(0,255,65,${Math.random()*0.5+0.2})`;
+      ctx.fillText(c, x, y);
+      if (y > canvas.height && Math.random() > 0.975) rows[i] = 0;
+      else rows[i] = y + 14;
+    });
+    bgAnimId = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// -- GEO GRID --
+function initGeo() {
+  const SIZE = 40; let t = 0;
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const phase = t * 0.008;
+    for (let x = 0; x <= canvas.width + SIZE; x += SIZE) {
+      for (let y = 0; y <= canvas.height + SIZE; y += SIZE) {
+        const d = Math.sqrt((x - canvas.width/2)**2 + (y - canvas.height/2)**2);
+        const a = 0.04 + 0.03 * Math.sin(d * 0.02 - phase);
+        ctx.strokeStyle = `rgba(99,132,255,${a})`;
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(x, y, SIZE, SIZE);
+      }
+    }
+    t++; bgAnimId = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// -- WAVES --
+function initWaves() {
+  let t = 0;
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for (let i = 3; i >= 0; i--) {
+      ctx.beginPath();
+      const yBase = canvas.height * (0.5 + i * 0.12);
+      const amp   = 30 + i * 15;
+      const freq  = 0.008 - i * 0.001;
+      const speed = t * (0.015 + i * 0.005);
+      ctx.moveTo(0, yBase);
+      for (let x = 0; x <= canvas.width; x += 3) {
+        ctx.lineTo(x, yBase + Math.sin(x * freq + speed) * amp + Math.sin(x * freq * 2 - speed * 1.3) * amp * 0.4);
+      }
+      ctx.lineTo(canvas.width, canvas.height);
+      ctx.lineTo(0, canvas.height);
+      ctx.closePath();
+      const alpha = 0.06 - i * 0.01;
+      ctx.fillStyle = `rgba(99,132,255,${alpha})`;
+      ctx.fill();
+    }
+    t++; bgAnimId = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function stopBg() {
+  if (bgAnimId) { cancelAnimationFrame(bgAnimId); bgAnimId = null; }
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function startBg(name) {
+  stopBg();
+  if (name === 'space')  initSpace();
+  if (name === 'rain')   initRain();
+  if (name === 'matrix') initMatrix();
+  if (name === 'geo')    initGeo();
+  if (name === 'waves')  initWaves();
+}
+
+// ═══════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════
+document.getElementById('settings-btn').onclick = () => {
+  document.getElementById('settings-panel').classList.add('open');
+};
+document.getElementById('close-settings').onclick = () => {
+  document.getElementById('settings-panel').classList.remove('open');
+};
+
+function setTheme(name, card) {
+  document.documentElement.setAttribute('data-theme', name === 'dark' ? '' : name);
+  currentTheme = name;
+  document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('active'));
+  card.classList.add('active');
+  save();
+}
+
+function setBg(name, card) {
+  currentBg = name;
+  startBg(name);
+  document.querySelectorAll('.bg-card').forEach(c => c.classList.remove('active'));
+  card.classList.add('active');
+  save();
+}
+
+function toggleSwitch(el) {
+  el.classList.toggle('on');
+  if (el.id === 'toggle-typing') typingEffect = el.classList.contains('on');
+  if (el.id === 'toggle-anim')   animEnabled  = el.classList.contains('on');
+  save();
+}
+
+// ═══════════════════════════════════════════
+//  PERSIST
+// ═══════════════════════════════════════════
+function save() {
+  try {
+    localStorage.setItem('ai_cfg', JSON.stringify({
+      theme: currentTheme, bg: currentBg,
+      typing: typingEffect, anim: animEnabled,
+    }));
+  } catch(_) {}
+}
+function loadSettings() {
+  try {
+    const c = JSON.parse(localStorage.getItem('ai_cfg') || '{}');
+    if (c.theme) {
+      currentTheme = c.theme;
+      document.documentElement.setAttribute('data-theme', c.theme === 'dark' ? '' : c.theme);
+      const card = document.querySelector(`[data-theme="${c.theme}"]`);
+      if (card) {
+        document.querySelectorAll('.theme-card').forEach(x => x.classList.remove('active'));
+        card.classList.add('active');
+      }
+    }
+    if (c.bg) {
+      currentBg = c.bg;
+      startBg(c.bg);
+      const bgCard = document.querySelector(`[data-bg="${c.bg}"]`);
+      if (bgCard) {
+        document.querySelectorAll('.bg-card').forEach(x => x.classList.remove('active'));
+        bgCard.classList.add('active');
+      }
+    }
+    if (c.typing !== undefined) {
+      typingEffect = c.typing;
+      document.getElementById('toggle-typing').classList.toggle('on', typingEffect);
+    }
+    if (c.anim !== undefined) {
+      animEnabled = c.anim;
+      document.getElementById('toggle-anim').classList.toggle('on', animEnabled);
+    }
+  } catch(_) {}
+}
+
+// ═══════════════════════════════════════════
+//  MESSAGES
+// ═══════════════════════════════════════════
+const msgContainer = document.getElementById('messages');
+const welcome      = document.getElementById('welcome');
+
+function getTime() {
+  return new Date().toLocaleTimeString('ru', {hour:'2-digit',minute:'2-digit'});
+}
+
+function hideWelcome() {
+  if (welcome && welcome.parentNode === msgContainer) {
+    welcome.style.opacity = '0';
+    welcome.style.transition = 'opacity 0.2s';
+    setTimeout(() => welcome.remove(), 200);
+  }
+}
+
+function appendMessage(role, text) {
+  hideWelcome();
+  const row = document.createElement('div');
+  row.className = `msg-row ${role}`;
+
+  const avatarSvg = role === 'user'
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M3 20a9 9 0 0 1 18 0"/><circle cx="19" cy="7" r="3" fill="var(--accent)" stroke="none"/></svg>`;
+
+  row.innerHTML = `
+    <div class="msg-avatar">${avatarSvg}</div>
+    <div class="bubble">
+      <span class="msg-text"></span>
+      <span class="bubble-time">${getTime()}</span>
+    </div>`;
+
+  msgContainer.appendChild(row);
+  scrollBottom();
+
+  const span = row.querySelector('.msg-text');
+  if (typingEffect && role === 'ai' && text.length < 800) {
+    let i = 0;
+    const interval = setInterval(() => {
+      span.textContent = text.slice(0, ++i);
+      scrollBottom();
+      if (i >= text.length) clearInterval(interval);
+    }, 12);
+  } else {
+    span.textContent = text;
+  }
+  return row;
+}
+
+function showTyping() {
+  const row = document.createElement('div');
+  row.className = 'msg-row ai'; row.id = 'typing-row';
+  row.innerHTML = `
+    <div class="msg-avatar"><svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M3 20a9 9 0 0 1 18 0"/></svg></div>
+    <div class="typing-indicator">
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+    </div>`;
+  msgContainer.appendChild(row);
+  scrollBottom();
+}
+
+function hideTyping() {
+  const t = document.getElementById('typing-row');
+  if (t) t.remove();
+}
+
+function scrollBottom() {
+  msgContainer.scrollTop = msgContainer.scrollHeight;
+}
+
+// ═══════════════════════════════════════════
+//  GROQ API
+// ═══════════════════════════════════════════
+async function callGroq(userMsg) {
+  history.push({ role: 'user', content: userMsg });
+  const messages = [{ role: 'system', content: SYSTEM_PROMPT }, ...history.slice(-16)];
+
+  let resp;
+  try {
+    resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      mode: 'cors',
+      headers: {
+        'Authorization': 'Bearer ' + GROQ_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ model: GROQ_MODEL, messages, temperature: 0.7, max_tokens: 1024 })
+    });
+  } catch(netErr) {
+    // Network-level error (no internet, CORS block, etc.)
+    throw new Error('Нет соединения с сервером: ' + netErr.message);
+  }
+
+  if (!resp.ok) {
+    let errBody = '';
+    try { const j = await resp.json(); errBody = j?.error?.message || JSON.stringify(j); }
+    catch(_) { errBody = await resp.text().catch(() => ''); }
+    throw new Error('Groq ' + resp.status + ': ' + errBody.slice(0,150));
+  }
+
+  const data = await resp.json();
+  const reply = (data.choices?.[0]?.message?.content || '').trim();
+  if (!reply) throw new Error('Пустой ответ от API');
+  history.push({ role: 'assistant', content: reply });
+  return reply;
+}
+
+// ═══════════════════════════════════════════
+//  VOICE RECORDING (Groq Whisper)
+// ═══════════════════════════════════════════
+let mediaRecorder = null;
+let audioChunks   = [];
+let isRecording   = false;
+
+async function toggleRecording() {
+  if (isRecording) {
+    stopRecording();
+  } else {
+    await startRecording();
+  }
+}
+
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioChunks  = [];
+
+    // Выбираем поддерживаемый формат
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      ? 'audio/webm;codecs=opus'
+      : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : 'audio/mp4';
+
+    mediaRecorder = new MediaRecorder(stream, { mimeType });
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      await transcribeAudio(audioChunks, mimeType);
+    };
+
+    mediaRecorder.start(100);
+    isRecording = true;
+    document.getElementById('voice-btn').classList.add('recording');
+    showToast('🎙 Запись... нажми снова чтобы остановить');
+  } catch(e) {
+    showToast('Нет доступа к микрофону: ' + e.message.slice(0,40));
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && isRecording) {
+    mediaRecorder.stop();
+    isRecording = false;
+    document.getElementById('voice-btn').classList.remove('recording');
+    showToast('⏳ Распознаю речь...');
+  }
+}
+
+async function transcribeAudio(chunks, mimeType) {
+  const ext  = mimeType.includes('mp4') ? 'mp4' : 'webm';
+  const blob = new Blob(chunks, { type: mimeType });
+  const file = new File([blob], `voice.${ext}`, { type: mimeType });
+
+  // Показываем "волны" пока идёт распознавание
+  const voiceRow = appendVoiceWaiting();
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('model', 'whisper-large-v3');
+  formData.append('language', 'ru');
+  formData.append('response_format', 'json');
+
+  try {
+    const resp = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + GROQ_API_KEY },
+      body: formData
+    });
+    const data = await resp.json();
+    const text = data?.text?.trim();
+
+    // Убираем "волны"
+    voiceRow.remove();
+
+    if (!text) { showToast('Речь не распознана'); return; }
+
+    // Вставляем текст в поле и отправляем
+    document.getElementById('user-input').value = text;
+    showToast('✅ Распознано: ' + text.slice(0,40));
+    await sendMessage();
+  } catch(e) {
+    voiceRow.remove();
+    showToast('Ошибка распознавания: ' + e.message.slice(0,40));
+  }
+}
+
+function appendVoiceWaiting() {
+  hideWelcome();
+  const row = document.createElement('div');
+  row.className = 'msg-row user';
+  row.innerHTML = `
+    <div class="msg-avatar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    </div>
+    <div class="bubble">
+      <div class="voice-bubble">
+        <div class="voice-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          </svg>
+        </div>
+        <div class="voice-bars">
+          <div class="voice-bar"></div>
+          <div class="voice-bar"></div>
+          <div class="voice-bar"></div>
+          <div class="voice-bar"></div>
+          <div class="voice-bar"></div>
+        </div>
+      </div>
+      <span class="bubble-time">${getTime()}</span>
+    </div>`;
+  msgContainer.appendChild(row);
+  scrollBottom();
+  return row;
+}
+
+// ═══════════════════════════════════════════
+//  PHOTO UPLOAD + Vision (Groq llama vision)
+// ═══════════════════════════════════════════
+function openPhoto() {
+  document.getElementById('photo-input').click();
+}
+
+async function handlePhoto(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+
+  // Читаем файл как base64
+  const base64 = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload  = () => res(r.result); // data:image/...;base64,...
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+
+  // Показываем превью в чате
+  hideWelcome();
+  const previewRow = document.createElement('div');
+  previewRow.className = 'msg-row user';
+  const caption = document.getElementById('user-input').value.trim() || 'Что на этом фото?';
+  previewRow.innerHTML = `
+    <div class="msg-avatar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+        <circle cx="12" cy="7" r="4"/>
+      </svg>
+    </div>
+    <div class="bubble">
+      <img src="${base64}" class="bubble-img" alt="фото"/>
+      <span class="msg-text">${caption}</span>
+      <span class="bubble-time">${getTime()}</span>
+    </div>`;
+  msgContainer.appendChild(previewRow);
+  scrollBottom();
+  document.getElementById('user-input').value = '';
+
+  // Отправляем в Groq vision
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  showTyping();
+
+  // Добавляем в историю как текст (Groq vision через llama)
+  history.push({ role: 'user', content: caption + ' [пользователь прислал фото]' });
+
+  try {
+    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + GROQ_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        max_tokens: 1024,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: base64 } },
+              { type: 'text', text: caption }
+            ]
+          }
+        ]
+      })
+    });
+
+    const data  = await resp.json();
+    const reply = data?.choices?.[0]?.message?.content?.trim();
+
+    hideTyping();
+    if (reply) {
+      history.push({ role: 'assistant', content: reply });
+      appendMessage('ai', reply);
+    } else {
+      const err = data?.error?.message || 'Пустой ответ';
+      appendMessage('ai', '⚠️ Ошибка анализа фото: ' + err.slice(0,120));
+    }
+  } catch(e) {
+    hideTyping();
+    appendMessage('ai', '⚠️ Ошибка: ' + e.message.slice(0,80));
+  }
+
+  isLoading = false;
+  document.getElementById('send-btn').disabled = false;
+}
+
+// ═══════════════════════════════════════════
+//  SEND
+// ═══════════════════════════════════════════
+async function sendMessage() {
+  const input = document.getElementById('user-input');
+  const text  = input.value.trim();
+  if (!text || isLoading) return;
+
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  input.value = ''; input.style.height = 'auto';
+
+  appendMessage('user', text);
+  showTyping();
+
+  try {
+    const reply = await callGroq(text);
+    hideTyping();
+    appendMessage('ai', reply);
+  } catch(e) {
+    hideTyping();
+    appendMessage('ai', 'Ошибка: ' + e.message);
+    showToast('Ошибка: ' + e.message.slice(0,60));
+  }
+
+  isLoading = false;
+  document.getElementById('send-btn').disabled = false;
+  input.focus();
+}
+
+function clearInput() {
+  const inp = document.getElementById('user-input');
+  inp.value = ''; inp.style.height = 'auto';
+}
+
+function useHint(el) {
+  const text = el.textContent.trim();
+  document.getElementById('user-input').value = text;
+  sendMessage();
+}
+
+// ═══════════════════════════════════════════
+//  CLEAR HISTORY
+// ═══════════════════════════════════════════
+document.getElementById('clear-history-btn').onclick = () => {
+  history = [];
+  msgContainer.innerHTML = '';
+  msgContainer.appendChild(welcome);
+  welcome.style.opacity = '1';
+  welcome.style.transition = '';
+  showToast('История очищена');
+};
+
+// ═══════════════════════════════════════════
+//  INPUT EVENTS
+// ═══════════════════════════════════════════
+const userInput = document.getElementById('user-input');
+userInput.addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+userInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+// ═══════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+loadSettings();
+userInput.focus();
+</script>
+</body>
+</html>
